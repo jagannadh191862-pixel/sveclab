@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const { db } = require('./db');
+const { seed } = require('./seed');
 const { authenticateToken, requireAdmin } = require('./middleware/auth');
 
 const authController = require('./controllers/authController');
@@ -18,7 +19,11 @@ const settingsController = require('./controllers/settingsController');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
+try {
+  seed();
+} catch (error) {
+  console.error('Database seeding failed:', error);
+}
 // Middleware
 app.use(cors());
 app.use(express.json());
