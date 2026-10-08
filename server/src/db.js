@@ -2,12 +2,20 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const dbDir = path.join(__dirname, '..', 'data');
+// Vercel serverless functions cannot reliably use the project directory
+// for runtime-created files. Use /tmp on Vercel and the normal data folder locally.
+const isVercel = Boolean(process.env.VERCEL);
+
+const dbDir = isVercel
+  ? '/tmp'
+  : path.join(__dirname, '..', 'data');
+
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
 const dbPath = path.join(dbDir, 'svec_lab_scheduler.db');
+
 const db = new Database(dbPath, {
   // verbose: console.log
 });
@@ -129,7 +137,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       booking_id TEXT UNIQUE NOT NULL,
-      date TEXT NOT NULL, -- YYYY-MM-DD
+      date TEXT NOT NULL,
       lab_id INTEGER NOT NULL REFERENCES labs(id) ON DELETE RESTRICT,
       slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE RESTRICT,
       faculty_id INTEGER NOT NULL REFERENCES faculty(id) ON DELETE RESTRICT,
@@ -152,23 +160,41 @@ function initDatabase() {
     );
 
     -- CRITICAL DATABASE-LEVEL DOUBLE BOOKING PROTECTION
-    -- Ensures at database engine level that no two active bookings can share same (lab_id, date, slot_id)
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_active_bookings_unique 
-    ON bookings (lab_id, date, slot_id) 
+    -- Ensures at database engine level that no two active bookings
+    -- can share the same (lab_id, date, slot_id)
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_active_bookings_unique
+    ON bookings (lab_id, date, slot_id)
     WHERE status = 'BOOKED';
 
     -- Performance Indexes
-    CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings (date);
-    CREATE INDEX IF NOT EXISTS idx_bookings_lab_date ON bookings (lab_id, date);
-    CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings (booked_by);
-    CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings (status);
-    CREATE INDEX IF NOT EXISTS idx_bookings_dept ON bookings (department_id);
+    CREATE INDEX IF NOT EXISTS idx_bookings_date
+    ON bookings (date);
+
+    CREATE INDEX IF NOT EXISTS idx_bookings_lab_date
+    ON bookings (lab_id, date);
+
+    CREATE INDEX IF NOT EXISTS idx_bookings_user
+    ON bookings (booked_by);
+
+    CREATE INDEX IF NOT EXISTS idx_bookings_status
+    ON bookings (status);
+
+    CREATE INDEX IF NOT EXISTS idx_bookings_dept
+    ON bookings (department_id);
 
     -- Audit Logs
     CREATE TABLE IF NOT EXISTS audit_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       booking_id TEXT NOT NULL,
-      action TEXT NOT NULL CHECK(action IN ('CREATED', 'MODIFIED', 'CANCELLED', 'DELETED', 'ADMIN_BOOKING_CREATED')),
+      action TEXT NOT NULL CHECK(
+        action IN (
+          'CREATED',
+          'MODIFIED',
+          'CANCELLED',
+          'DELETED',
+          'ADMIN_BOOKING_CREATED'
+        )
+      ),
       performed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
       performed_by_name TEXT NOT NULL,
       performed_by_role TEXT NOT NULL,
@@ -178,8 +204,11 @@ function initDatabase() {
       reason TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_audit_booking_id ON audit_logs (booking_id);
-    CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs (timestamp);
+    CREATE INDEX IF NOT EXISTS idx_audit_booking_id
+    ON audit_logs (booking_id);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_timestamp
+    ON audit_logs (timestamp);
   `);
 }
 
