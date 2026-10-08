@@ -57,7 +57,7 @@ app.put('/api/bookings/:id/admin-update', authenticateToken, requireAdmin, booki
 app.delete('/api/bookings/:id/admin-delete', authenticateToken, requireAdmin, bookingController.adminDeleteBooking);
 
 // Master Data
-app.get('/api/master/departments', authenticateToken, masterController.getDepartments);
+app.get('/api/master/departments', masterController.getDepartments);
 app.post('/api/master/departments', authenticateToken, requireAdmin, masterController.createDepartment);
 app.put('/api/master/departments/:id', authenticateToken, requireAdmin, masterController.updateDepartment);
 
